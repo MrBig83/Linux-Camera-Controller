@@ -6,7 +6,8 @@ This documentation is the public, navigable companion to the repository README. 
 
 - [MVP scope](mvp.md) — the first useful version and its deliberately narrow boundary.
 - [Architecture](architecture.md) — how the application fits around Linux's existing video stack.
-- [Development setup](development.md) — the planned local development environment and first implementation step.
+- [First-time camera setup](setup.md) — the Nobara/Fedora-oriented one-time system preparation.
+- [Development setup](development.md) — the local development environment and app commands.
 - [GitHub Project board](https://github.com/users/MrBig83/projects/36) — the current public work queue.
 
 ## Project principles

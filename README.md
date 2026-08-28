@@ -59,6 +59,7 @@ The underlying manual pipeline has already been proven with a Logitech StreamCam
 - [Documentation index](docs/README.md)
 - [MVP scope](docs/mvp.md)
 - [Architecture](docs/architecture.md)
+- [First-time camera setup](docs/setup.md)
 - [Development setup](docs/development.md)
 - [Project board](https://github.com/users/MrBig83/projects/36)
 
