@@ -65,6 +65,10 @@ Contributions are welcome.
 
 `main` is protected: changes must arrive through pull requests, and the project maintainer reviews and merges them.
 
+## Support
+
+Linux Camera Controller is free to use. If it saves you time and you want to support its development, you can [donate via PayPal](https://paypal.me/MrBig83).
+
 ## License
 
 A license has not yet been selected. An explicit open-source license will be added before the project accepts broader code contributions.
