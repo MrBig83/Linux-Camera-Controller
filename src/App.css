@@ -48,6 +48,48 @@ h1 {
   background: #181f2c;
 }
 
+.pipeline-card {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #2d3748;
+  border-radius: 1rem;
+  background: #181f2c;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.section-heading h2 {
+  margin-bottom: 0.25rem;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #aeb8c8;
+}
+
+.pipeline-state {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pipeline-state.stopped {
+  color: #c3cad7;
+  background: #2d3748;
+}
+
+.pipeline-state.running {
+  color: #08110f;
+  background: #70d5c5;
+}
+
 h2 {
   margin-top: 0;
 }
@@ -70,6 +112,16 @@ button {
 
 button:hover {
   background: #9ae5d9;
+}
+
+.stop-button {
+  border-color: #f3bd6b;
+  color: #1e1505;
+  background: #f3bd6b;
+}
+
+.stop-button:hover {
+  background: #f8d091;
 }
 
 button:disabled {
@@ -110,6 +162,14 @@ dl div {
   border-top: 1px solid #2d3748;
 }
 
+.pipeline-settings {
+  margin: 1rem 0;
+}
+
+.pipeline-settings dd {
+  text-align: right;
+}
+
 dt {
   display: flex;
   align-items: center;
@@ -146,4 +206,30 @@ dd small {
 .error {
   margin: 1rem 0 0;
   color: #ff9b9b;
+}
+
+.pipeline-message {
+  margin: 0.75rem 0 0;
+  color: #aeb8c8;
+}
+
+@media (max-width: 40rem) {
+  .container {
+    padding-inline: 1rem;
+  }
+
+  .section-heading,
+  dl div {
+    display: block;
+  }
+
+  .pipeline-state {
+    display: inline-block;
+    margin-top: 0.75rem;
+  }
+
+  .pipeline-settings dd {
+    margin-top: 0.25rem;
+    text-align: left;
+  }
 }

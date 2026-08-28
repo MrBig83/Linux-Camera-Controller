@@ -1,5 +1,11 @@
 use serde::Serialize;
-use std::{path::Path, process::Command};
+use std::{
+    path::Path,
+    process::{Child, Command, Stdio},
+    sync::Mutex,
+    thread,
+    time::Duration,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +38,27 @@ struct PreflightResult {
     ready: bool,
     summary: String,
     checks: Vec<PreflightCheck>,
+}
+
+#[derive(Default)]
+struct PipelineManager {
+    child: Mutex<Option<Child>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PipelineConfiguration {
+    source_name: &'static str,
+    source_available: bool,
+    virtual_camera_available: bool,
+    transform: &'static str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PipelineStatus {
+    state: &'static str,
+    message: String,
 }
 
 #[tauri::command]
@@ -74,6 +101,187 @@ fn find_loopback_camera(device_list: &str) -> Option<String> {
     }
 
     None
+}
+
+fn find_streamcam_camera(device_list: &str) -> Option<String> {
+    let mut is_streamcam = false;
+
+    for line in device_list.lines() {
+        if line.starts_with(char::is_whitespace) {
+            let device = line.trim();
+            if is_streamcam && device.starts_with("/dev/video") {
+                return Some(device.to_owned());
+            }
+        } else {
+            is_streamcam = line.contains("Logitech StreamCam");
+        }
+    }
+
+    None
+}
+
+fn list_video_devices() -> Result<String, String> {
+    command_output("v4l2-ctl", &["--list-devices"]).ok_or_else(|| {
+        "Camera discovery is unavailable. Check that V4L2 tools are installed.".to_owned()
+    })
+}
+
+fn resolved_pipeline_devices() -> Result<(String, String), String> {
+    let devices = list_video_devices()?;
+    let source = find_streamcam_camera(&devices).ok_or_else(|| {
+        "Logitech StreamCam was not found. Connect it, then refresh readiness.".to_owned()
+    })?;
+    let virtual_camera = find_loopback_camera(&devices).ok_or_else(|| {
+        "No configured virtual camera was found. Complete the first-time setup, then refresh readiness."
+            .to_owned()
+    })?;
+
+    Ok((source, virtual_camera))
+}
+
+fn pipeline_status(manager: &PipelineManager) -> Result<PipelineStatus, String> {
+    let mut child = manager
+        .child
+        .lock()
+        .map_err(|_| "The camera pipeline state is unavailable. Restart the app.".to_owned())?;
+
+    let is_running = match child.as_mut() {
+        Some(process) => process
+            .try_wait()
+            .map_err(|_| "Could not read the camera pipeline state. Restart the app.".to_owned())?
+            .is_none(),
+        None => false,
+    };
+
+    if !is_running {
+        *child = None;
+    }
+
+    Ok(PipelineStatus {
+        state: if is_running { "running" } else { "stopped" },
+        message: if is_running {
+            "The rotated StreamCam pipeline is running.".to_owned()
+        } else {
+            "The camera pipeline is stopped.".to_owned()
+        },
+    })
+}
+
+#[tauri::command]
+fn get_pipeline_configuration() -> PipelineConfiguration {
+    let devices = list_video_devices().unwrap_or_default();
+
+    PipelineConfiguration {
+        source_name: "Logitech StreamCam",
+        source_available: find_streamcam_camera(&devices).is_some(),
+        virtual_camera_available: find_loopback_camera(&devices).is_some(),
+        transform: "180° rotation",
+    }
+}
+
+#[tauri::command]
+fn get_pipeline_status(
+    manager: tauri::State<'_, PipelineManager>,
+) -> Result<PipelineStatus, String> {
+    pipeline_status(&manager)
+}
+
+#[tauri::command]
+fn start_pipeline(manager: tauri::State<'_, PipelineManager>) -> Result<PipelineStatus, String> {
+    if pipeline_status(&manager)?.state == "running" {
+        return Err("The camera pipeline is already running.".to_owned());
+    }
+
+    if !command_succeeds("ffmpeg", &["-version"]) {
+        return Err(
+            "FFmpeg is not available. Resolve the readiness check before starting.".to_owned(),
+        );
+    }
+
+    let (source, virtual_camera) = resolved_pipeline_devices()?;
+    let mut process = Command::new("ffmpeg")
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "warning",
+            "-nostdin",
+            "-f",
+            "v4l2",
+            "-video_size",
+            "1280x720",
+            "-framerate",
+            "30",
+            "-i",
+            &source,
+            "-vf",
+            "hflip,vflip,format=yuyv422",
+            "-pix_fmt",
+            "yuyv422",
+            "-f",
+            "v4l2",
+            &virtual_camera,
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| "FFmpeg could not start. Check camera readiness and try again.".to_owned())?;
+
+    thread::sleep(Duration::from_millis(400));
+    if process
+        .try_wait()
+        .map_err(|_| "Could not verify the FFmpeg process. Try again.".to_owned())?
+        .is_some()
+    {
+        return Err(
+            "FFmpeg stopped immediately. The camera may be in use or the selected mode is unavailable."
+                .to_owned(),
+        );
+    }
+
+    let mut child = manager
+        .child
+        .lock()
+        .map_err(|_| "The camera pipeline state is unavailable. Restart the app.".to_owned())?;
+    *child = Some(process);
+
+    Ok(PipelineStatus {
+        state: "running",
+        message: "The rotated StreamCam pipeline is running. Select StreamCam Rotated in Teams."
+            .to_owned(),
+    })
+}
+
+#[tauri::command]
+fn stop_pipeline(manager: tauri::State<'_, PipelineManager>) -> Result<PipelineStatus, String> {
+    let mut child = manager
+        .child
+        .lock()
+        .map_err(|_| "The camera pipeline state is unavailable. Restart the app.".to_owned())?;
+
+    let Some(mut process) = child.take() else {
+        return Ok(PipelineStatus {
+            state: "stopped",
+            message: "The camera pipeline is already stopped.".to_owned(),
+        });
+    };
+
+    if process
+        .try_wait()
+        .map_err(|_| "Could not read the camera pipeline state. Restart the app.".to_owned())?
+        .is_none()
+    {
+        process
+            .kill()
+            .map_err(|_| "The camera pipeline could not be stopped. Restart the app.".to_owned())?;
+    }
+
+    let _ = process.wait();
+
+    Ok(PipelineStatus {
+        state: "stopped",
+        message: "The camera pipeline stopped and released the StreamCam.".to_owned(),
+    })
 }
 
 #[tauri::command]
@@ -188,14 +396,22 @@ fn get_preflight() -> PreflightResult {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_app_status, get_preflight])
+        .manage(PipelineManager::default())
+        .invoke_handler(tauri::generate_handler![
+            get_app_status,
+            get_preflight,
+            get_pipeline_configuration,
+            get_pipeline_status,
+            start_pipeline,
+            stop_pipeline
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 #[cfg(test)]
 mod tests {
-    use super::find_loopback_camera;
+    use super::{find_loopback_camera, find_streamcam_camera};
 
     #[test]
     fn finds_a_loopback_video_device() {
@@ -212,5 +428,15 @@ mod tests {
         let devices = "Logitech StreamCam:\n\t/dev/video1\n\t/dev/video2\n";
 
         assert_eq!(find_loopback_camera(devices), None);
+    }
+
+    #[test]
+    fn finds_the_first_streamcam_video_device() {
+        let devices = "Logitech StreamCam:\n\t/dev/video1\n\t/dev/video2\n";
+
+        assert_eq!(
+            find_streamcam_camera(devices),
+            Some("/dev/video1".to_owned())
+        );
     }
 }
