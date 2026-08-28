@@ -54,6 +54,14 @@ The application will not execute arbitrary commands from its UI. Its Rust backen
 
 The underlying manual pipeline has already been proven with a Logitech StreamCam, FFmpeg and `v4l2loopback`. The next milestone is to reproduce that pipeline from a minimal Tauri application before expanding discovery, settings or UI polish.
 
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [MVP scope](docs/mvp.md)
+- [Architecture](docs/architecture.md)
+- [Development setup](docs/development.md)
+- [Project board](https://github.com/users/MrBig83/projects/36)
+
 ## Contributing
 
 Contributions are welcome.
