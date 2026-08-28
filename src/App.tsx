@@ -1,25 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
-type AppStatus = {
-  application: string;
-  phase: string;
-  cameraAccess: boolean;
+type CheckStatus = "ready" | "attention";
+
+type PreflightCheck = {
+  id: string;
+  label: string;
+  status: CheckStatus;
+  summary: string;
+  nextStep: string | null;
+};
+
+type PreflightResult = {
+  ready: boolean;
+  summary: string;
+  checks: PreflightCheck[];
 };
 
 function App() {
-  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function checkAppStatus() {
+  async function checkPreflight() {
     try {
+      setIsChecking(true);
       setError(null);
-      setStatus(await invoke<AppStatus>("get_app_status"));
+      setPreflight(await invoke<PreflightResult>("get_preflight"));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setIsChecking(false);
     }
   }
+
+  useEffect(() => {
+    void checkPreflight();
+  }, []);
 
   return (
     <main className="container">
@@ -30,33 +48,37 @@ function App() {
       </p>
 
       <section className="status-card" aria-live="polite">
-        <h2>Foundation status</h2>
+        <h2>System readiness</h2>
         <p>
-          The Tauri, React and Rust connection is the first verified building block.
-          Camera access comes next.
+          Check the local tools and virtual camera before starting a camera pipeline.
         </p>
-        <button type="button" onClick={checkAppStatus}>
-          Check app status
+        <button type="button" onClick={checkPreflight} disabled={isChecking}>
+          {isChecking ? "Checking…" : "Refresh readiness"}
         </button>
 
-        {status && (
-          <dl>
-            <div>
-              <dt>Application</dt>
-              <dd>{status.application}</dd>
-            </div>
-            <div>
-              <dt>Phase</dt>
-              <dd>{status.phase}</dd>
-            </div>
-            <div>
-              <dt>Camera access</dt>
-              <dd>{status.cameraAccess ? "Available" : "Not implemented yet"}</dd>
-            </div>
-          </dl>
+        {preflight && (
+          <div className="preflight-results">
+            <p className={`readiness ${preflight.ready ? "ready" : "attention"}`}>
+              {preflight.summary}
+            </p>
+            <dl>
+              {preflight.checks.map((check) => (
+                <div key={check.id}>
+                  <dt>
+                    <span className={`check-indicator ${check.status}`} aria-hidden="true" />
+                    {check.label}
+                  </dt>
+                  <dd>
+                    <span>{check.summary}</span>
+                    {check.nextStep && <small>{check.nextStep}</small>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         )}
 
-        {error && <p className="error">Could not read app status: {error}</p>}
+        {error && <p className="error">Could not check system readiness: {error}</p>}
       </section>
     </main>
   );

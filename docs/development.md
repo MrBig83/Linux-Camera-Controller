@@ -2,7 +2,7 @@
 
 ## Current status
 
-The repository is documentation-first. No Tauri application code has been added yet.
+The Tauri + React + TypeScript foundation runs on Nobara. Before starting the desktop app on a Wayland/Nvidia system, use the documented development workaround below.
 
 ## Target environment
 
@@ -12,7 +12,16 @@ The repository is documentation-first. No Tauri application code has been added 
 - Tauri with React and TypeScript
 - FFmpeg, `v4l2-utils` and `v4l2loopback` for camera-pipeline verification
 
-The exact package and toolchain verification is tracked in [the Tauri scaffold issue](https://github.com/MrBig83/Linux-Camera-Controller/issues/4). It will be documented here once tested on the target system instead of guessing commands in advance.
+Install the Tauri toolchain dependencies following the [official Tauri Linux prerequisites](https://v2.tauri.app/start/prerequisites/). For the camera-specific one-time setup, see [First-time camera setup](setup.md).
+
+## Run locally
+
+```bash
+npm install
+WEBKIT_DISABLE_DMABUF_RENDERER=1 npm run tauri dev
+```
+
+`WEBKIT_DISABLE_DMABUF_RENDERER=1` is a development workaround for a known WebKitGTK/Wayland GPU-rendering problem seen on the target Nobara system. It is not an application requirement on every Linux desktop.
 
 ## First implementation milestone
 
