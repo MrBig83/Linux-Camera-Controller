@@ -67,11 +67,13 @@ Contributions are welcome.
 
 ## Support
 
-Linux Camera Controller is free to use. If it saves you time and you want to support its development, you can [donate via PayPal](https://paypal.me/MrBig83).
+Linux Camera Controller is free and open source. If it saves you time and you want to support its development:
+
+<a href="https://paypal.me/MrBig83"><img src="https://img.shields.io/badge/Donate-PayPal-0070BA?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal"></a>
 
 ## License
 
-A license has not yet been selected. An explicit open-source license will be added before the project accepts broader code contributions.
+This project is licensed under the [MIT License](LICENSE).
 
 ## Credits
 
